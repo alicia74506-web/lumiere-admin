@@ -7,6 +7,48 @@
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
+<style>
+#loginScreen{position:fixed;inset:0;background:#13100a;display:flex;align-items:center;justify-content:center;z-index:9999;}
+.login-box{width:360px;text-align:center;padding:48px 40px;border:1px solid #3a2e16;border-radius:2px;background:#1a1510;}
+.login-logo{font-family:'Cormorant Garamond',serif;font-size:28px;letter-spacing:.4em;color:#c9a84c;margin-bottom:6px;}
+.login-sub{font-size:10px;letter-spacing:.2em;color:#5a4a2a;margin-bottom:36px;font-family:'DM Sans',sans-serif;}
+.login-input{width:100%;padding:12px 16px;background:#0e0b07;border:1px solid #3a2e16;color:#e8d9b0;font-family:'DM Sans',sans-serif;font-size:14px;border-radius:2px;outline:none;margin-bottom:12px;letter-spacing:.1em;}
+.login-input:focus{border-color:#c9a84c;}
+.login-input::placeholder{color:#3a3020;letter-spacing:.05em;}
+.login-btn{width:100%;padding:13px;background:#c9a84c;color:#13100a;border:none;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;letter-spacing:.1em;cursor:pointer;border-radius:2px;margin-top:4px;}
+.login-btn:hover{background:#b89440;}
+.login-err{color:#db7a4a;font-size:12px;margin-top:10px;display:none;font-family:'DM Sans',sans-serif;}
+.login-deco{font-size:32px;margin-bottom:20px;opacity:.6;}
+</style>
+
+<div id="loginScreen">
+  <div class="login-box">
+    <div class="login-deco">🌸</div>
+    <div class="login-logo">LUMIÈRE</div>
+    <div class="login-sub">ADMIN CONSOLE</div>
+    <input class="login-input" type="password" id="pwInput" placeholder="비밀번호를 입력하세요" onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="login-btn" onclick="doLogin()">로그인</button>
+    <div class="login-err" id="loginErr">비밀번호가 올바르지 않습니다.</div>
+  </div>
+</div>
+
+<script>
+const ADMIN_PW = 'Ll626723^^';
+function doLogin(){
+  const pw = document.getElementById('pwInput').value;
+  if(pw === ADMIN_PW){
+    document.getElementById('loginScreen').style.display='none';
+    sessionStorage.setItem('lumiere_auth','1');
+  } else {
+    document.getElementById('loginErr').style.display='block';
+    document.getElementById('pwInput').value='';
+    document.getElementById('pwInput').focus();
+  }
+}
+if(sessionStorage.getItem('lumiere_auth')==='1'){
+  document.getElementById('loginScreen').style.display='none';
+}
+</script>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 :root{
   --gold:#c9a84c;--gold-light:#e8d9b0;--gold-pale:#f7f2e4;
