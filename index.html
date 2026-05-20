@@ -7,7 +7,14 @@
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
-<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --gold:#c9a84c;--gold-light:#e8d9b0;--gold-pale:#f7f2e4;
+  --dark:#13100a;--dark2:#1e1810;--dark3:#2e2416;
+  --ink:#2a1e0a;--muted:#9a8a6a;--border:#d4c4a0;--border-light:#ede8de;
+  --bg:#f9f7f4;--bg2:#fff;--sidebar-w:220px;--topbar-h:56px;
+}
+
 #loginScreen{position:fixed;inset:0;background:#13100a;display:flex;align-items:center;justify-content:center;z-index:9999;}
 .login-box{width:360px;text-align:center;padding:48px 40px;border:1px solid #3a2e16;border-radius:2px;background:#1a1510;}
 .login-logo{font-family:'Cormorant Garamond',serif;font-size:28px;letter-spacing:.4em;color:#c9a84c;margin-bottom:6px;}
@@ -19,43 +26,7 @@
 .login-btn:hover{background:#b89440;}
 .login-err{color:#db7a4a;font-size:12px;margin-top:10px;display:none;font-family:'DM Sans',sans-serif;}
 .login-deco{font-size:32px;margin-bottom:20px;opacity:.6;}
-</style>
 
-<div id="loginScreen">
-  <div class="login-box">
-    <div class="login-deco">🌸</div>
-    <div class="login-logo">LUMIÈRE</div>
-    <div class="login-sub">ADMIN CONSOLE</div>
-    <input class="login-input" type="password" id="pwInput" placeholder="비밀번호를 입력하세요" onkeydown="if(event.key==='Enter')doLogin()">
-    <button class="login-btn" onclick="doLogin()">로그인</button>
-    <div class="login-err" id="loginErr">비밀번호가 올바르지 않습니다.</div>
-  </div>
-</div>
-
-<script>
-const ADMIN_PW = 'Ll626723^^';
-function doLogin(){
-  const pw = document.getElementById('pwInput').value;
-  if(pw === ADMIN_PW){
-    document.getElementById('loginScreen').style.display='none';
-    sessionStorage.setItem('lumiere_auth','1');
-  } else {
-    document.getElementById('loginErr').style.display='block';
-    document.getElementById('pwInput').value='';
-    document.getElementById('pwInput').focus();
-  }
-}
-if(sessionStorage.getItem('lumiere_auth')==='1'){
-  document.getElementById('loginScreen').style.display='none';
-}
-</script>
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
-:root{
-  --gold:#c9a84c;--gold-light:#e8d9b0;--gold-pale:#f7f2e4;
-  --dark:#13100a;--dark2:#1e1810;--dark3:#2e2416;
-  --ink:#2a1e0a;--muted:#9a8a6a;--border:#d4c4a0;--border-light:#ede8de;
-  --bg:#f9f7f4;--bg2:#fff;--sidebar-w:220px;--topbar-h:56px;
-}
 body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);}
 
 /* ── LAYOUT ── */
@@ -241,6 +212,18 @@ tr:hover td{background:#faf8f3;}
 <body>
 
 <!-- TOPBAR -->
+
+<div id="loginScreen">
+  <div class="login-box">
+    <div class="login-deco">🌸</div>
+    <div class="login-logo">LUMIÈRE</div>
+    <div class="login-sub">ADMIN CONSOLE</div>
+    <input class="login-input" type="password" id="pwInput" placeholder="비밀번호를 입력하세요" onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="login-btn" onclick="doLogin()">로그인</button>
+    <div class="login-err" id="loginErr">비밀번호가 올바르지 않습니다.</div>
+  </div>
+</div>
+
 <div class="topbar">
   <div class="brand">LUMIÈRE <span>ADMIN CONSOLE</span></div>
   <div class="topbar-right">
@@ -1048,5 +1031,24 @@ try{const s=localStorage.getItem('lumiere_cfg');if(s)config=JSON.parse(s);}catch
 applyRole();
 renderDashboard();
 </script>
+
+<script>
+const ADMIN_PW = 'Ll626723^^';
+function doLogin(){
+  const pw = document.getElementById('pwInput').value;
+  if(pw === ADMIN_PW){
+    document.getElementById('loginScreen').style.display='none';
+    sessionStorage.setItem('lumiere_auth','1');
+  } else {
+    document.getElementById('loginErr').style.display='block';
+    document.getElementById('pwInput').value='';
+    document.getElementById('pwInput').focus();
+  }
+}
+if(sessionStorage.getItem('lumiere_auth')==='1'){
+  document.getElementById('loginScreen').style.display='none';
+}
+</script>
+
 </body>
 </html>
