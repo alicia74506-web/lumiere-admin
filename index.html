@@ -725,8 +725,18 @@ function showLogin() { closeModal('join-modal'); openModal('login-modal'); }
     <p style="font-size:11px;color:#b8975a;margin-bottom:24px;">마케팅 동의 시 10% 쿠폰 즉시 발급 ✦</p>
     <div style="margin-bottom:12px;"><label style="display:block;font-size:11px;color:#666;margin-bottom:4px;">성함 *</label><input id="join-name" type="text" placeholder="이름" style="width:100%;padding:10px 14px;border:1px solid #e0e0e0;border-radius:6px;font-size:13px;outline:none;"></div>
     <div style="margin-bottom:12px;"><label style="display:block;font-size:11px;color:#666;margin-bottom:4px;">이메일 *</label><input id="join-email" type="email" placeholder="이메일" style="width:100%;padding:10px 14px;border:1px solid #e0e0e0;border-radius:6px;font-size:13px;outline:none;"></div>
-    <div style="margin-bottom:12px;"><label style="display:block;font-size:11px;color:#666;margin-bottom:4px;">비밀번호 * (6자 이상)</label><input id="join-pw" type="password" placeholder="비밀번호" style="width:100%;padding:10px 14px;border:1px solid #e0e0e0;border-radius:6px;font-size:13px;outline:none;"></div>
-    <div style="margin-bottom:20px;"><label style="display:block;font-size:11px;color:#666;margin-bottom:4px;">연락처</label><input id="join-phone" type="tel" placeholder="010-0000-0000" style="width:100%;padding:10px 14px;border:1px solid #e0e0e0;border-radius:6px;font-size:13px;outline:none;"></div>
+    <div style="margin-bottom:6px;"><label style="display:block;font-size:11px;color:#666;margin-bottom:4px;">비밀번호 *</label><input id="join-pw" type="password" placeholder="비밀번호" style="width:100%;padding:10px 14px;border:1px solid #e0e0e0;border-radius:6px;font-size:13px;outline:none;"></div>
+    <p style="font-size:11px;color:#999;margin-bottom:12px;">8자 이상, 영문 대소문자 + 숫자 + 특수기호(!@#$%^&*) 포함</p>
+    <div style="margin-bottom:12px;"><label style="display:block;font-size:11px;color:#666;margin-bottom:4px;">연락처</label><input id="join-phone" type="tel" placeholder="010-0000-0000" style="width:100%;padding:10px 14px;border:1px solid #e0e0e0;border-radius:6px;font-size:13px;outline:none;"></div>
+    <div style="margin-bottom:6px;">
+      <label style="display:block;font-size:11px;color:#666;margin-bottom:4px;">주소</label>
+      <div style="display:flex;gap:8px;margin-bottom:6px;">
+        <input id="join-postcode" type="text" placeholder="우편번호" readonly style="width:120px;padding:10px 14px;border:1px solid #e0e0e0;border-radius:6px;font-size:13px;outline:none;background:#f9f9f9;">
+        <button type="button" onclick="searchAddress()" style="padding:10px 16px;background:#1a1a1a;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;white-space:nowrap;">주소 검색</button>
+      </div>
+      <input id="join-address" type="text" placeholder="기본 주소" readonly style="width:100%;padding:10px 14px;border:1px solid #e0e0e0;border-radius:6px;font-size:13px;outline:none;background:#f9f9f9;margin-bottom:6px;">
+      <input id="join-address-detail" type="text" placeholder="상세 주소 (동, 호수 등)" style="width:100%;padding:10px 14px;border:1px solid #e0e0e0;border-radius:6px;font-size:13px;outline:none;">
+    </div>
     <div style="border-top:1px solid #f0f0f0;padding-top:16px;margin-bottom:16px;">
       <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#333;margin-bottom:10px;cursor:pointer;"><input type="checkbox" id="join-terms"> (필수) 이용약관 동의</label>
       <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#333;margin-bottom:10px;cursor:pointer;"><input type="checkbox" id="join-privacy"> (필수) 개인정보 수집 및 이용 동의</label>
@@ -769,6 +779,20 @@ document.querySelectorAll('.filter-btn').forEach(btn=>{
     btn.classList.add('active')
   })
 })
+</script>
+
+<!-- 카카오 주소검색 API -->
+<script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
+<script>
+function searchAddress() {
+  new daum.Postcode({
+    oncomplete: function(data) {
+      document.getElementById('join-postcode').value = data.zonecode;
+      document.getElementById('join-address').value = data.roadAddress || data.jibunAddress;
+      document.getElementById('join-address-detail').focus();
+    }
+  }).open();
+}
 </script>
 </body>
 </html>
