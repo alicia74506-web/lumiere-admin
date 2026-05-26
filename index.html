@@ -504,26 +504,41 @@ footer{background:var(--darker);padding:60px;display:grid;grid-template-columns:
 </section>
 
 <!-- FOUNDER -->
-<section id="founder" style="padding:100px 60px;display:block;background:var(--dark)">
-  <div class="founder-body" style="max-width:800px;margin:0 auto;padding:0">
+<section id="founder" style="padding:0;display:grid;grid-template-columns:1fr 1fr;background:var(--dark);min-height:600px">
+  <!-- 왼쪽: 이니셜 카드 -->
+  <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px 60px;border-right:1px solid rgba(255,255,255,0.08)">
+    <div style="font-family:'Cormorant Garamond',serif;font-size:120px;font-weight:300;color:var(--gold);opacity:0.25;line-height:1;margin-bottom:24px;">李</div>
+    <div style="width:40px;height:1px;background:var(--gold);margin-bottom:24px;"></div>
+    <h3 style="font-family:'Cormorant Garamond',serif;font-size:28px;font-weight:300;color:var(--white);letter-spacing:2px;margin-bottom:6px;">이수진</h3>
+    <p style="font-size:12px;color:rgba(255,255,255,0.4);letter-spacing:3px;margin-bottom:4px;">Alicia Yi</p>
+    <p style="font-size:11px;color:var(--gold);letter-spacing:2px;margin-bottom:40px;">CEO, LUMIÈRE</p>
+    <div style="text-align:left;width:100%;max-width:240px;">
+      <div style="display:flex;gap:12px;margin-bottom:12px;font-size:12px;">
+        <span style="color:var(--gold);letter-spacing:1px;min-width:20px;">前</span>
+        <span style="color:rgba(255,255,255,0.5);">㈜헤리티지산후조리센터 CEO</span>
+      </div>
+      <div style="display:flex;gap:12px;margin-bottom:12px;font-size:12px;">
+        <span style="color:var(--gold);letter-spacing:1px;min-width:20px;">現</span>
+        <span style="color:rgba(255,255,255,0.5);">㈜케이웰루틴 CEO</span>
+      </div>
+      <div style="display:flex;gap:12px;font-size:12px;">
+        <span style="color:var(--gold);letter-spacing:1px;min-width:20px;">現</span>
+        <span style="color:rgba(255,255,255,0.5);">㈜뤼미에르 CEO</span>
+      </div>
+    </div>
+  </div>
+  <!-- 오른쪽: 텍스트 -->
+  <div class="founder-body" style="padding:80px 70px;display:flex;flex-direction:column;justify-content:center;">
     <p class="section-label">Founder</p>
     <h2 class="section-title"><em>향</em>으로 완성하는<br>공간의 기억</h2>
-    <blockquote class="founder-quote">"특급호텔에서 25년을 일하며, 저는 공간을 완성하는 마지막 한 조각이 무엇인지 늘 고민했습니다.<br>그 답은 향이었습니다."</blockquote>
+    <blockquote class="founder-quote">"특급호텔에서 25년을 일하며, 저는 공간을 완성하는<br>마지막 한 조각이 무엇인지 늘 고민했습니다.<br>그 답은 향이었습니다."</blockquote>
     <ul class="founder-bio">
       <li>특급호텔 25년 경력 (프런트, 웨딩, 프로모션, 교육)</li>
       <li>마세라티 VIP 럭셔리 키트 기획</li>
-      <li>유명 입시학원 × 뤼미에르 집중력 공간조향 기획</li>
+      <li>유명 입시학원 × 뤼미에르<br>&nbsp;&nbsp;&nbsp;&nbsp;집중력 공간조향 기획</li>
       <li>다양한 업종의 B2B 향 솔루션 개발</li>
       <li>산후조리원 공간 조향 및 향기 마케팅 총괄</li>
     </ul>
-    <div class="founder-name-card">
-      <div class="founder-initial">李</div>
-      <div class="founder-name-info">
-        <h4>이수진 · Alicia Yi</h4>
-        <p>前 ㈜헤리티지산후조리센터 CEO</p>
-        <p style="margin-top:4px">現 ㈜케이웰루틴 CEO &nbsp;·&nbsp; 現 ㈜뤼미에르 CEO</p>
-      </div>
-    </div>
   </div>
 </section>
 
