@@ -251,6 +251,12 @@ footer{background:var(--darker);padding:60px;display:grid;grid-template-columns:
   .footer-bottom{flex-direction:column;gap:12px;text-align:center}
 }
 </style>
+<script>
+function openModal(id) { document.getElementById(id).style.display = 'flex'; }
+function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+function showJoin() { closeModal('login-modal'); openModal('join-modal'); }
+function showLogin() { closeModal('join-modal'); openModal('login-modal'); }
+</script>
 </head>
 <body>
 
