@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.gstatic.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://fonts.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://*.firebaseio.com https://*.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firestore.googleapis.com; img-src 'self' data: blob:;">
+
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Lumière — Art of Scents</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -251,12 +251,7 @@ footer{background:var(--darker);padding:60px;display:grid;grid-template-columns:
   .footer-bottom{flex-direction:column;gap:12px;text-align:center}
 }
 </style>
-<script>
-function openModal(id) { document.getElementById(id).style.display = 'flex'; }
-function closeModal(id) { document.getElementById(id).style.display = 'none'; }
-function showJoin() { closeModal('login-modal'); openModal('join-modal'); }
-function showLogin() { closeModal('join-modal'); openModal('login-modal'); }
-</script>
+
 </head>
 <body>
 
@@ -733,6 +728,91 @@ document.querySelectorAll('.filter-btn').forEach(btn=>{
     btn.classList.add('active')
   })
 })
+</script>
+
+<!-- Firebase CDN -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyBFL4RLpzNakCpuH-zou4G5qjCfcUmpUxw",
+  authDomain: "lumiere-admin.firebaseapp.com",
+  projectId: "lumiere-admin",
+  storageBucket: "lumiere-admin.firebasestorage.app",
+  messagingSenderId: "582718642120",
+  appId: "1:582718642120:web:a2f2557aefd6c45fb192fd"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+const ADMIN_EMAIL = "alicia@kwellroutine.com";
+
+function openModal(id) { document.getElementById(id).style.display = "flex"; }
+function closeModal(id) { document.getElementById(id).style.display = "none"; }
+function showJoin() { closeModal("login-modal"); openModal("join-modal"); }
+function showLogin() { closeModal("join-modal"); openModal("login-modal"); }
+
+auth.onAuthStateChanged(function(user) {
+  var loginBtn = document.getElementById("nav-login");
+  var joinBtn = document.getElementById("nav-join");
+  var adminBtn = document.getElementById("nav-admin");
+  var logoutBtn = document.getElementById("nav-logout");
+  var userSpan = document.getElementById("nav-user");
+  if (user) {
+    if(loginBtn) loginBtn.style.display = "none";
+    if(joinBtn) joinBtn.style.display = "none";
+    if(logoutBtn) logoutBtn.style.display = "inline-block";
+    if(userSpan) { userSpan.style.display = "inline-block"; userSpan.textContent = user.email.split("@")[0]; }
+    if(user.email === ADMIN_EMAIL && adminBtn) adminBtn.style.display = "inline-block";
+  } else {
+    if(loginBtn) loginBtn.style.display = "inline-block";
+    if(joinBtn) joinBtn.style.display = "inline-block";
+    if(logoutBtn) logoutBtn.style.display = "none";
+    if(adminBtn) adminBtn.style.display = "none";
+    if(userSpan) userSpan.style.display = "none";
+  }
+});
+
+function doLogin() {
+  var email = document.getElementById("login-email").value.trim();
+  var pw = document.getElementById("login-pw").value;
+  var err = document.getElementById("login-error");
+  err.textContent = "";
+  auth.signInWithEmailAndPassword(email, pw)
+    .then(function() { closeModal("login-modal"); })
+    .catch(function() { err.textContent = "이메일 또는 비밀번호가 올바르지 않습니다."; });
+}
+
+function doJoin() {
+  var name = document.getElementById("join-name").value.trim();
+  var email = document.getElementById("join-email").value.trim();
+  var pw = document.getElementById("join-pw").value;
+  var phone = document.getElementById("join-phone").value.trim();
+  var terms = document.getElementById("join-terms").checked;
+  var privacy = document.getElementById("join-privacy").checked;
+  var age = document.getElementById("join-age").checked;
+  var mkt = document.getElementById("join-marketing").checked;
+  var err = document.getElementById("join-error");
+  err.textContent = "";
+  if (!name || !email || !pw) { err.textContent = "필수 항목을 입력해주세요."; return; }
+  if (!terms || !privacy || !age) { err.textContent = "필수 약관에 동의해주세요."; return; }
+  if (pw.length < 6) { err.textContent = "비밀번호는 6자 이상이어야 합니다."; return; }
+  auth.createUserWithEmailAndPassword(email, pw)
+    .then(function(cred) {
+      return db.collection("users").doc(cred.user.uid).set({ name:name, email:email, phone:phone, marketingAgreed:mkt, createdAt:firebase.firestore.FieldValue.serverTimestamp(), uid:cred.user.uid });
+    })
+    .then(function() {
+      closeModal("join-modal");
+      alert(mkt ? "가입을 환영합니다! 10% 할인 쿠폰이 발급되었습니다. 🎉" : "가입이 완료되었습니다. 환영합니다!");
+    })
+    .catch(function(e) {
+      if(e.code === "auth/email-already-in-use") err.textContent = "이미 사용 중인 이메일입니다.";
+      else err.textContent = "가입 중 오류가 발생했습니다.";
+    });
+}
+
+function doLogout() { auth.signOut(); }
 </script>
 </body>
 </html>
