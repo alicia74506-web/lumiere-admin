@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lumière Admin</title>
+
+<!-- Firebase -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+  import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy, where, onSnapshot, serverTimestamp, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+  // ✅ 여기에 Firebase 설정 붙여넣기
+  const firebaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_AUTH_DOMAIN",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_STORAGE_BUCKET",
+    messagingSenderId: "YOUR_SENDER_ID",
+    appId: "YOUR_APP_ID"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+
+  // Admin 이메일 (수진이 이메일)
+  const ADMIN_EMAIL = "alicia@kwellroutine.com";
+
+  // 전역 DB 참조
+  window._db = db;
+  window._auth = auth;
+  window._collections = { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy, where, onSnapshot, serverTimestamp, getDoc, setDoc };
+
+  // 인증 확인
+  onAuthStateChanged(auth, async (user) => {
+    if (!user || user.email !== ADMIN_EMAIL) {
+      document.getElementById("auth-wall").style.display = "flex";
+      document.getElementById("admin-body").style.display = "none";
+    } else {
+      document.getElementById("auth-wall").style.display = "none";
+      document.getElementById("admin-body").style.display = "flex";
+      document.getElementById("admin-email").textContent = user.email;
+      await loadDashboard();
+    }
+  });
+
+  window._signOut = async () => {
+    await signOut(auth);
+    location.href = "/";
+  };
+
+  // ========== 대시보드 ==========
+  async function loadDashboard() {
+    await loadSalesData();
+    await loadProductCount();
+    await loadCustomerCount();
+    await loadTopProducts();
+    await loadRecentOrders();
+  }
+
+  async function loadSalesData() {
+    const { collection: col, getDocs: get, query: q, where: w, orderBy: ob } = window._collections;
+    const db = window._db;
+
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const weekStart = new Date(now - 7 * 86400000);
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    try {
+      const snap = await get(col(db, "orders"));
+      let todaySales = 0, todayProfit = 0;
+      let weekSales = 0, weekProfit = 0;
+      let monthSales = 0, monthProfit = 0;
+
+      snap.forEach(d => {
+        const order = d.data();
+        const date = order.createdAt?.toDate ? order.createdAt.toDate() : new Date(order.createdAt);
+        const revenue = order.totalPrice || 0;
+        const cost = order.totalCost || 0;
+        const profit = revenue - cost;
+
+        if (date >= todayStart) { todaySales += revenue; todayProfit += profit; }
+        if (date >= weekStart)  { weekSales += revenue;  weekProfit += profit;  }
+        if (date >= monthStart) { monthSales += revenue; monthProfit += profit; }
+      });
+
+      setText("stat-today-sales",   "₩" + todaySales.toLocaleString());
+      setText("stat-today-profit",  "₩" + todayProfit.toLocaleString());
+      setText("stat-week-sales",    "₩" + weekSales.toLocaleString());
+      setText("stat-week-profit",   "₩" + weekProfit.toLocaleString());
+      setText("stat-month-sales",   "₩" + monthSales.toLocaleString());
+      setText("stat-month-profit",  "₩" + monthProfit.toLocaleString());
+    } catch(e) { console.error(e); }
+  }
+
+  async function loadProductCount() {
+    const snap = await window._collections.getDocs(window._collections.collection(window._db, "products"));
+    setText("stat-products", snap.size);
+  }
+
+  async function loadCustomerCount() {
+    const snap = await window._collections.getDocs(window._collections.collection(window._db, "users"));
+    let total = 0, marketing = 0;
+    snap.forEach(d => { total++; if (d.data().marketingAgreed) marketing++; });
+    setText("stat-customers", total);
+    setText("stat-marketing", marketing);
+  }
+
+  async function loadTopProducts() {
+    const { collection: col, getDocs: get, query: q, orderBy: ob } = window._collections;
+    const snap = await get(q(col(window._db, "products"), ob("soldCount", "desc")));
+    const list = document.getElementById("top-products-list");
+    if (!list) return;
+    list.innerHTML = "";
+    let rank = 1;
+    snap.forEach(d => {
+      if (rank > 5) return;
+      const p = d.data();
+      list.innerHTML += `<tr>
+        <td>${rank++}</td>
+        <td>${p.name || "-"}</td>
+        <td>₩${(p.price || 0).toLocaleString()}</td>
+        <td>${p.soldCount || 0}개</td>
+        <td class="${(p.stock || 0) <= 5 ? 'low-stock' : ''}">${p.stock || 0}개</td>
+      </tr>`;
+    });
+  }
+
+  async function loadRecentOrders() {
+    const { collection: col, getDocs: get, query: q, orderBy: ob } = window._collections;
+    const snap = await get(q(col(window._db, "orders"), ob("createdAt", "desc")));
+    const list = document.getElementById("recent-orders-list");
+    if (!list) return;
+    list.innerHTML = "";
+    let count = 0;
+    snap.forEach(d => {
+      if (count++ > 9) return;
+      const o = d.data();
+      const date = o.createdAt?.toDate ? o.createdAt.toDate() : new Date(o.createdAt || Date.now());
+      const profit = (o.totalPrice || 0) - (o.totalCost || 0);
+      list.innerHTML += `<tr>
+        <td>${date.toLocaleDateString("ko-KR")}</td>
+        <td>${o.customerName || "-"}</td>
+        <td>${(o.items || []).map(i => i.name).join(", ") || "-"}</td>
+        <td>₩${(o.totalPrice || 0).toLocaleString()}</td>
+        <td>₩${profit.toLocaleString()}</td>
+        <td><span class="badge badge-${o.status || 'pending'}">${statusLabel(o.status)}</span></td>
+      </tr>`;
+    });
+  }
+
+  // ========== 상품 관리 ==========
+  window.loadProducts = async () => {
+    const { collection: col, getDocs: get, query: q, orderBy: ob } = window._collections;
+    const snap = await get(q(col(window._db, "products"), ob("createdAt", "desc")));
+    const list = document.getElementById("products-list");
+    list.innerHTML = "";
+    snap.forEach(d => {
+      const p = d.data(); const id = d.id;
+      const profit = (p.price || 0) - (p.cost || 0);
+      list.innerHTML += `<tr>
+        <td>${p.category || "-"}</td>
+        <td>${p.name || "-"}</td>
+        <td>₩${(p.price || 0).toLocaleString()}</td>
+        <td>₩${(p.cost || 0).toLocaleString()}</td>
+        <td>₩${profit.toLocaleString()}</td>
+        <td class="${(p.stock || 0) <= 5 ? 'low-stock' : ''}">${p.stock || 0}</td>
+        <td>${p.soldCount || 0}</td>
+        <td>
+          <button class="btn-sm" onclick="editProduct('${id}')">수정</button>
+          <button class="btn-sm btn-danger" onclick="deleteProduct('${id}')">삭제</button>
+        </td>
+      </tr>`;
+    });
+  };
+
+  window.saveProduct = async () => {
+    const { collection: col, addDoc: add, doc: d, updateDoc: upd, serverTimestamp: ts } = window._collections;
+    const id = document.getElementById("product-id").value;
+    const data = {
+      category: document.getElementById("p-category").value,
+      name: document.getElementById("p-name").value,
+      price: parseInt(document.getElementById("p-price").value) || 0,
+      cost: parseInt(document.getElementById("p-cost").value) || 0,
+      stock: parseInt(document.getElementById("p-stock").value) || 0,
+      description: document.getElementById("p-desc").value,
+      updatedAt: ts()
+    };
+    if (!id) {
+      data.soldCount = 0;
+      data.createdAt = ts();
+      await add(col(window._db, "products"), data);
+    } else {
+      await upd(d(window._db, "products", id), data);
+    }
+    closeModal("product-modal");
+    await window.loadProducts();
+  };
+
+  window.editProduct = async (id) => {
+    const { doc: d, getDoc: gd } = window._collections;
+    const snap = await gd(d(window._db, "products", id));
+    const p = snap.data();
+    document.getElementById("product-id").value = id;
+    document.getElementById("p-category").value = p.category || "";
+    document.getElementById("p-name").value = p.name || "";
+    document.getElementById("p-price").value = p.price || "";
+    document.getElementById("p-cost").value = p.cost || "";
+    document.getElementById("p-stock").value = p.stock || "";
+    document.getElementById("p-desc").value = p.description || "";
+    document.getElementById("product-modal-title").textContent = "상품 수정";
+    openModal("product-modal");
+  };
+
+  window.deleteProduct = async (id) => {
+    if (!confirm("삭제하시겠습니까?")) return;
+    const { doc: d, deleteDoc: del } = window._collections;
+    await del(d(window._db, "products", id));
+    await window.loadProducts();
+  };
+
+  // ========== 고객 DB ==========
+  window.loadCustomers = async () => {
+    const { collection: col, getDocs: get, query: q, orderBy: ob } = window._collections;
+    const snap = await get(q(col(window._db, "users"), ob("createdAt", "desc")));
+    const list = document.getElementById("customers-list");
+    list.innerHTML = "";
+
+    // 구매 랭킹 계산
+    const orderSnap = await get(col(window._db, "orders"));
+    const purchaseMap = {};
+    orderSnap.forEach(d => {
+      const o = d.data();
+      if (o.customerEmail) {
+        purchaseMap[o.customerEmail] = (purchaseMap[o.customerEmail] || 0) + (o.totalPrice || 0);
+      }
+    });
+
+    const customers = [];
+    snap.forEach(d => { customers.push({ id: d.id, ...d.data() }); });
+    customers.sort((a, b) => (purchaseMap[b.email] || 0) - (purchaseMap[a.email] || 0));
+
+    customers.forEach((c, i) => {
+      const date = c.createdAt?.toDate ? c.createdAt.toDate() : new Date(c.createdAt || Date.now());
+      list.innerHTML += `<tr>
+        <td>${i + 1}</td>
+        <td>${c.name || "-"}</td>
+        <td>${c.email || "-"}</td>
+        <td>${c.phone || "-"}</td>
+        <td>₩${(purchaseMap[c.email] || 0).toLocaleString()}</td>
+        <td><span class="badge ${c.marketingAgreed ? 'badge-success' : 'badge-gray'}">${c.marketingAgreed ? "동의" : "미동의"}</span></td>
+        <td>${date.toLocaleDateString("ko-KR")}</td>
+      </tr>`;
+    });
+  };
+
+  // ========== 리뷰 관리 ==========
+  window.loadReviews = async () => {
+    const { collection: col, getDocs: get, query: q, orderBy: ob } = window._collections;
+    const snap = await get(q(col(window._db, "reviews"), ob("createdAt", "desc")));
+    const list = document.getElementById("reviews-list");
+    list.innerHTML = "";
+    snap.forEach(d => {
+      const r = d.data(); const id = d.id;
+      const date = r.createdAt?.toDate ? r.createdAt.toDate() : new Date(r.createdAt || Date.now());
+      list.innerHTML += `
+        <div class="review-card">
+          <div class="review-header">
+            <span class="review-product">${r.productName || "-"}</span>
+            <span class="review-author">${r.customerName || "익명"}</span>
+            <span class="review-date">${date.toLocaleDateString("ko-KR")}</span>
+          </div>
+          <p class="review-content">${r.content || ""}</p>
+          ${r.adminReply ? `<div class="admin-reply"><span class="reply-label">뤼미에르 답변</span><p>${r.adminReply}</p></div>` : ""}
+          <div class="reply-form">
+            <textarea id="reply-${id}" placeholder="답변을 입력하세요..." rows="2">${r.adminReply || ""}</textarea>
+            <button class="btn-sm" onclick="saveReply('${id}')">답변 저장</button>
+          </div>
+        </div>`;
+    });
+  };
+
+  window.saveReply = async (id) => {
+    const { doc: d, updateDoc: upd } = window._collections;
+    const reply = document.getElementById("reply-" + id).value;
+    await upd(d(window._db, "reviews", id), { adminReply: reply });
+    alert("답변이 저장되었습니다.");
+  };
+
+  // ========== 카카오 메시지 ==========
+  window.sendKakaoMessage = () => {
+    const msg = document.getElementById("kakao-msg").value;
+    const target = document.getElementById("kakao-target").value;
+    if (!msg) { alert("메시지를 입력하세요."); return; }
+    // 카카오 채널 관리자 페이지로 이동 (실제 발송은 카카오 비즈니스 API 연동 필요)
+    const kakaoUrl = "https://business.kakao.com/dashboard/";
+    alert(`[${target === "all" ? "전체" : "마케팅 동의"}] 고객에게 발송할 메시지:\n\n${msg}\n\n카카오 비즈니스 센터에서 직접 발송하거나,\n카카오 알림톡 API 연동 후 자동 발송됩니다.`);
+    window.open(kakaoUrl, "_blank");
+  };
+
+  // ========== Excel 다운로드 ==========
+  window.exportToExcel = async (type) => {
+    const { collection: col, getDocs: get, query: q, orderBy: ob } = window._collections;
+    let data = [], headers = [], filename = "";
+
+    if (type === "orders") {
+      const snap = await get(q(col(window._db, "orders"), ob("createdAt", "desc")));
+      headers = ["날짜", "고객명", "이메일", "상품", "판매가", "원가", "순수익", "상태"];
+      snap.forEach(d => {
+        const o = d.data();
+        const date = o.createdAt?.toDate ? o.createdAt.toDate() : new Date();
+        const profit = (o.totalPrice || 0) - (o.totalCost || 0);
+        data.push([
+          date.toLocaleDateString("ko-KR"),
+          o.customerName, o.customerEmail,
+          (o.items || []).map(i => i.name).join(", "),
+          o.totalPrice, o.totalCost, profit,
+          statusLabel(o.status)
+        ]);
+      });
+      filename = "뤼미에르_주문현황";
+    } else if (type === "customers") {
+      const snap = await get(q(col(window._db, "users"), ob("createdAt", "desc")));
+      headers = ["이름", "이메일", "연락처", "마케팅동의", "가입일"];
+      snap.forEach(d => {
+        const c = d.data();
+        const date = c.createdAt?.toDate ? c.createdAt.toDate() : new Date();
+        data.push([c.name, c.email, c.phone, c.marketingAgreed ? "동의" : "미동의", date.toLocaleDateString("ko-KR")]);
+      });
+      filename = "뤼미에르_고객DB";
+    } else if (type === "products") {
+      const snap = await get(q(col(window._db, "products"), ob("createdAt", "desc")));
+      headers = ["카테고리", "상품명", "판매가", "원가", "순수익", "재고", "판매수량"];
+      snap.forEach(d => {
+        const p = d.data();
+        data.push([p.category, p.name, p.price, p.cost, (p.price||0)-(p.cost||0), p.stock, p.soldCount]);
+      });
+      filename = "뤼미에르_상품현황";
+    }
+
+    // CSV 생성 (Excel에서 열리는 UTF-8 BOM 포함)
+    const BOM = "\uFEFF";
+    const csv = BOM + [headers, ...data].map(row => row.map(v => `"${v}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename + "_" + new Date().toLocaleDateString("ko-KR").replace(/\./g, "").replace(/ /g, "") + ".csv";
+    a.click();
+  };
+
+  // ========== 유틸 ==========
+  function setText(id, val) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = val;
+  }
+
+  function statusLabel(s) {
+    return { pending: "대기", confirmed: "확인", shipping: "배송중", delivered: "완료", cancelled: "취소" }[s] || "대기";
+  }
+
+  window.openProductModal = () => {
+    document.getElementById("product-id").value = "";
+    document.getElementById("p-category").value = "";
+    document.getElementById("p-name").value = "";
+    document.getElementById("p-price").value = "";
+    document.getElementById("p-cost").value = "";
+    document.getElementById("p-stock").value = "";
+    document.getElementById("p-desc").value = "";
+    document.getElementById("product-modal-title").textContent = "상품 등록";
+    openModal("product-modal");
+  };
+
+  window.showTab = (tab) => {
+    document.querySelectorAll(".tab-content").forEach(el => el.classList.remove("active"));
+    document.querySelectorAll(".nav-item").forEach(el => el.classList.remove("active"));
+    document.getElementById("tab-" + tab).classList.add("active");
+    document.querySelector(`[data-tab="${tab}"]`).classList.add("active");
+
+    if (tab === "products") window.loadProducts();
+    if (tab === "customers") window.loadCustomers();
+    if (tab === "reviews") window.loadReviews();
+  };
+
+  function openModal(id) { document.getElementById(id).style.display = "flex"; }
+  function closeModal(id) { document.getElementById(id).style.display = "none"; }
+  window.closeModal = closeModal;
+</script>
+
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; background: #f5f4f0; color: #1a1a1a; font-size: 14px; }
+
+/* Auth Wall */
+#auth-wall {
+  display: flex; align-items: center; justify-content: center;
+  height: 100vh; flex-direction: column; gap: 16px;
+  background: #f5f4f0;
+}
+#auth-wall h2 { font-size: 18px; color: #1a1a1a; font-weight: 500; }
+#auth-wall p { color: #666; font-size: 13px; }
+
+/* Layout */
+#admin-body { display: none; min-height: 100vh; }
+
+/* Sidebar */
+.sidebar {
+  width: 220px; min-height: 100vh; background: #1a1a1a; color: #fff;
+  display: flex; flex-direction: column; padding: 0; position: fixed; top: 0; left: 0;
+}
+.sidebar-logo {
+  padding: 28px 24px 20px;
+  border-bottom: 0.5px solid rgba(255,255,255,0.1);
+}
+.sidebar-logo h1 { font-size: 18px; font-weight: 400; letter-spacing: 2px; color: #d4af7a; }
+.sidebar-logo p { font-size: 10px; color: rgba(255,255,255,0.4); letter-spacing: 1px; margin-top: 2px; }
+.sidebar-nav { flex: 1; padding: 16px 0; }
+.nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 24px; cursor: pointer; color: rgba(255,255,255,0.5);
+  font-size: 13px; transition: all 0.15s; border-left: 2px solid transparent;
+}
+.nav-item:hover { color: #fff; background: rgba(255,255,255,0.05); }
+.nav-item.active { color: #d4af7a; border-left-color: #d4af7a; background: rgba(212,175,122,0.08); }
+.nav-icon { font-size: 15px; width: 18px; text-align: center; }
+.sidebar-footer {
+  padding: 16px 24px;
+  border-top: 0.5px solid rgba(255,255,255,0.1);
+  font-size: 11px; color: rgba(255,255,255,0.3);
+}
+.sidebar-footer span { display: block; margin-bottom: 8px; word-break: break-all; }
+.logout-btn {
+  background: none; border: 0.5px solid rgba(255,255,255,0.2);
+  color: rgba(255,255,255,0.5); padding: 6px 14px; border-radius: 4px;
+  cursor: pointer; font-size: 11px; transition: all 0.15s;
+}
+.logout-btn:hover { color: #fff; border-color: rgba(255,255,255,0.5); }
+
+/* Main */
+.main { margin-left: 220px; padding: 32px; min-height: 100vh; }
+.page-title { font-size: 20px; font-weight: 500; margin-bottom: 24px; color: #1a1a1a; }
+
+/* Tab content */
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* Stat grid */
+.stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 28px; }
+.stat-section { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.stat-section-label {
+  grid-column: 1/-1; font-size: 11px; color: #999; font-weight: 500;
+  letter-spacing: 0.5px; text-transform: uppercase; padding-top: 4px;
+}
+.stat-card {
+  background: #fff; border: 0.5px solid #e8e6e0; border-radius: 10px;
+  padding: 16px; min-width: 0;
+}
+.stat-label { font-size: 11px; color: #999; margin-bottom: 6px; }
+.stat-value { font-size: 20px; font-weight: 500; color: #1a1a1a; }
+.stat-value.profit { color: #2e7d5a; }
+
+/* Tables */
+.table-wrap { background: #fff; border: 0.5px solid #e8e6e0; border-radius: 10px; overflow: hidden; }
+.table-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 20px; border-bottom: 0.5px solid #e8e6e0;
+}
+.table-header h3 { font-size: 14px; font-weight: 500; }
+table { width: 100%; border-collapse: collapse; }
+th { padding: 10px 14px; text-align: left; font-size: 11px; color: #999; font-weight: 500; border-bottom: 0.5px solid #e8e6e0; background: #faf9f7; }
+td { padding: 11px 14px; font-size: 13px; border-bottom: 0.5px solid #f0ede8; color: #333; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: #faf9f7; }
+.low-stock { color: #c0392b; font-weight: 500; }
+
+/* Buttons */
+.btn {
+  background: #1a1a1a; color: #fff; border: none; padding: 9px 18px;
+  border-radius: 6px; cursor: pointer; font-size: 13px; transition: all 0.15s;
+}
+.btn:hover { background: #333; }
+.btn-outline {
+  background: none; color: #1a1a1a; border: 0.5px solid #ccc;
+  padding: 9px 18px; border-radius: 6px; cursor: pointer; font-size: 13px; transition: all 0.15s;
+}
+.btn-outline:hover { background: #f5f4f0; }
+.btn-gold {
+  background: #c9a96e; color: #fff; border: none; padding: 9px 18px;
+  border-radius: 6px; cursor: pointer; font-size: 13px; transition: all 0.15s;
+}
+.btn-gold:hover { background: #b8934a; }
+.btn-sm {
+  background: none; border: 0.5px solid #ccc; color: #555;
+  padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; margin-right: 4px;
+}
+.btn-sm:hover { background: #f0ede8; }
+.btn-danger { border-color: #f0a0a0; color: #c0392b; }
+.btn-danger:hover { background: #fef0f0; }
+
+/* Badge */
+.badge {
+  display: inline-block; padding: 3px 8px; border-radius: 4px;
+  font-size: 11px; font-weight: 500;
+}
+.badge-pending  { background: #fff8e1; color: #f59e0b; }
+.badge-confirmed { background: #e1f5fe; color: #0284c7; }
+.badge-shipping { background: #f3e8ff; color: #7c3aed; }
+.badge-delivered { background: #e6f4ea; color: #2e7d52; }
+.badge-cancelled { background: #fef0f0; color: #c0392b; }
+.badge-success { background: #e6f4ea; color: #2e7d52; }
+.badge-gray { background: #f0ede8; color: #999; }
+
+/* Modal */
+.modal-overlay {
+  display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.5); z-index: 100;
+  align-items: center; justify-content: center;
+}
+.modal {
+  background: #fff; border-radius: 12px; padding: 28px;
+  width: 480px; max-height: 80vh; overflow-y: auto;
+}
+.modal h3 { font-size: 16px; font-weight: 500; margin-bottom: 20px; }
+.form-group { margin-bottom: 14px; }
+.form-group label { display: block; font-size: 12px; color: #666; margin-bottom: 5px; }
+.form-group input, .form-group select, .form-group textarea {
+  width: 100%; padding: 9px 12px; border: 0.5px solid #ddd; border-radius: 6px;
+  font-size: 13px; outline: none; transition: border-color 0.15s;
+}
+.form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: #c9a96e; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+
+/* Reviews */
+.review-card {
+  background: #fff; border: 0.5px solid #e8e6e0; border-radius: 10px;
+  padding: 18px 20px; margin-bottom: 12px;
+}
+.review-header { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.review-product { font-weight: 500; font-size: 13px; color: #1a1a1a; }
+.review-author { font-size: 12px; color: #999; }
+.review-date { font-size: 12px; color: #bbb; margin-left: auto; }
+.review-content { font-size: 13px; color: #444; line-height: 1.6; margin-bottom: 12px; }
+.admin-reply {
+  background: #faf9f7; border-left: 2px solid #c9a96e; padding: 10px 14px;
+  margin-bottom: 12px; border-radius: 0 6px 6px 0;
+}
+.reply-label { font-size: 11px; color: #c9a96e; font-weight: 500; display: block; margin-bottom: 4px; }
+.reply-form { display: flex; gap: 8px; align-items: flex-end; }
+.reply-form textarea {
+  flex: 1; padding: 8px 12px; border: 0.5px solid #ddd; border-radius: 6px;
+  font-size: 13px; outline: none; resize: vertical; font-family: inherit;
+}
+.reply-form textarea:focus { border-color: #c9a96e; }
+
+/* Kakao section */
+.kakao-wrap {
+  background: #fff; border: 0.5px solid #e8e6e0; border-radius: 10px; padding: 24px;
+}
+.kakao-wrap h3 { font-size: 15px; font-weight: 500; margin-bottom: 6px; }
+.kakao-wrap p { font-size: 13px; color: #888; margin-bottom: 20px; }
+.kakao-preview {
+  background: #FEE500; border-radius: 18px 18px 18px 4px;
+  padding: 12px 16px; font-size: 13px; color: #1a1a1a;
+  max-width: 280px; margin: 16px 0; line-height: 1.5;
+  white-space: pre-line;
+}
+
+/* Action bar */
+.action-bar {
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;
+}
+.export-row { display: flex; gap: 8px; }
+
+/* Section gap */
+.section-gap { height: 20px; }
+
+/* Responsive */
+@media (max-width: 768px) {
+  .sidebar { width: 60px; }
+  .nav-item span { display: none; }
+  .sidebar-logo h1 { display: none; }
+  .main { margin-left: 60px; padding: 20px; }
+  .stat-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- Auth Wall -->
+<div id="auth-wall">
+  <h2>접근 제한</h2>
+  <p>관리자 계정으로 로그인이 필요합니다.</p>
+  <a href="/" style="color:#c9a96e; font-size:13px;">메인으로 돌아가기</a>
+</div>
+
+<!-- Admin Body -->
+<div id="admin-body">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <h1>Lumière</h1>
+      <p>ADMIN DASHBOARD</p>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-item active" data-tab="dashboard" onclick="showTab('dashboard')">
+        <span class="nav-icon">◈</span><span>대시보드</span>
+      </div>
+      <div class="nav-item" data-tab="products" onclick="showTab('products')">
+        <span class="nav-icon">◉</span><span>상품 관리</span>
+      </div>
+      <div class="nav-item" data-tab="orders" onclick="showTab('orders')">
+        <span class="nav-icon">◎</span><span>주문 현황</span>
+      </div>
+      <div class="nav-item" data-tab="customers" onclick="showTab('customers')">
+        <span class="nav-icon">◐</span><span>고객 DB</span>
+      </div>
+      <div class="nav-item" data-tab="reviews" onclick="showTab('reviews')">
+        <span class="nav-icon">◑</span><span>리뷰 관리</span>
+      </div>
+      <div class="nav-item" data-tab="kakao" onclick="showTab('kakao')">
+        <span class="nav-icon">◒</span><span>카카오 메시지</span>
+      </div>
+    </nav>
+    <div class="sidebar-footer">
+      <span id="admin-email"></span>
+      <button class="logout-btn" onclick="_signOut()">로그아웃</button>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main">
+
+    <!-- 대시보드 -->
+    <div id="tab-dashboard" class="tab-content active">
+      <p class="page-title">대시보드</p>
+
+      <div class="stat-grid">
+        <!-- 오늘 -->
+        <div class="stat-card">
+          <div class="stat-label">오늘 매출</div>
+          <div class="stat-value" id="stat-today-sales">₩0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">오늘 순수익</div>
+          <div class="stat-value profit" id="stat-today-profit">₩0</div>
+        </div>
+        <!-- 주간 -->
+        <div class="stat-card">
+          <div class="stat-label">주간 매출</div>
+          <div class="stat-value" id="stat-week-sales">₩0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">주간 순수익</div>
+          <div class="stat-value profit" id="stat-week-profit">₩0</div>
+        </div>
+        <!-- 월간 -->
+        <div class="stat-card">
+          <div class="stat-label">이번 달 매출</div>
+          <div class="stat-value" id="stat-month-sales">₩0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">이번 달 순수익</div>
+          <div class="stat-value profit" id="stat-month-profit">₩0</div>
+        </div>
+      </div>
+
+      <!-- 요약 카드 -->
+      <div style="display:grid; grid-template-columns: repeat(3,1fr); gap:12px; margin-bottom:24px;">
+        <div class="stat-card">
+          <div class="stat-label">등록 상품</div>
+          <div class="stat-value" id="stat-products">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">전체 고객</div>
+          <div class="stat-value" id="stat-customers">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">마케팅 동의</div>
+          <div class="stat-value" id="stat-marketing">0</div>
+        </div>
+      </div>
+
+      <!-- 인기 상품 -->
+      <div class="table-wrap" style="margin-bottom:20px;">
+        <div class="table-header">
+          <h3>베스트 상품 TOP 5</h3>
+          <button class="btn-outline" style="font-size:12px; padding:6px 12px;" onclick="exportToExcel('products')">엑셀 다운로드</button>
+        </div>
+        <table>
+          <thead><tr><th>순위</th><th>상품명</th><th>판매가</th><th>판매수량</th><th>재고</th></tr></thead>
+          <tbody id="top-products-list"><tr><td colspan="5" style="text-align:center;color:#bbb;padding:20px;">데이터 없음</td></tr></tbody>
+        </table>
+      </div>
+
+      <!-- 최근 주문 -->
+      <div class="table-wrap">
+        <div class="table-header">
+          <h3>최근 주문 10건</h3>
+          <button class="btn-outline" style="font-size:12px; padding:6px 12px;" onclick="exportToExcel('orders')">엑셀 다운로드</button>
+        </div>
+        <table>
+          <thead><tr><th>날짜</th><th>고객명</th><th>상품</th><th>판매가</th><th>순수익</th><th>상태</th></tr></thead>
+          <tbody id="recent-orders-list"><tr><td colspan="6" style="text-align:center;color:#bbb;padding:20px;">데이터 없음</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 상품 관리 -->
+    <div id="tab-products" class="tab-content">
+      <p class="page-title">상품 관리</p>
+      <div class="action-bar">
+        <button class="btn" onclick="openProductModal()">+ 상품 등록</button>
+        <div class="export-row">
+          <button class="btn-outline" onclick="exportToExcel('products')">엑셀 다운로드</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>카테고리</th><th>상품명</th><th>판매가</th><th>원가</th><th>순수익</th><th>재고</th><th>판매수</th><th>관리</th></tr></thead>
+          <tbody id="products-list"><tr><td colspan="8" style="text-align:center;color:#bbb;padding:20px;">상품을 등록하세요.</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 주문 현황 -->
+    <div id="tab-orders" class="tab-content">
+      <p class="page-title">주문 현황</p>
+      <div class="action-bar">
+        <div></div>
+        <div class="export-row">
+          <button class="btn-outline" onclick="exportToExcel('orders')">엑셀 다운로드 (전체)</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>날짜</th><th>고객명</th><th>이메일</th><th>상품</th><th>판매가</th><th>원가</th><th>순수익</th><th>상태</th></tr></thead>
+          <tbody id="orders-list"><tr><td colspan="8" style="text-align:center;color:#bbb;padding:20px;">데이터 없음</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 고객 DB -->
+    <div id="tab-customers" class="tab-content">
+      <p class="page-title">고객 DB</p>
+      <div class="action-bar">
+        <p style="font-size:13px;color:#888;">구매 금액 기준 랭킹 정렬</p>
+        <button class="btn-outline" onclick="exportToExcel('customers')">엑셀 다운로드</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>랭킹</th><th>이름</th><th>이메일</th><th>연락처</th><th>누적 구매액</th><th>마케팅</th><th>가입일</th></tr></thead>
+          <tbody id="customers-list"><tr><td colspan="7" style="text-align:center;color:#bbb;padding:20px;">데이터 없음</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 리뷰 관리 -->
+    <div id="tab-reviews" class="tab-content">
+      <p class="page-title">리뷰 관리</p>
+      <div id="reviews-list"><p style="color:#bbb;text-align:center;padding:40px;">리뷰가 없습니다.</p></div>
+    </div>
+
+    <!-- 카카오 메시지 -->
+    <div id="tab-kakao" class="tab-content">
+      <p class="page-title">카카오 메시지 발송</p>
+      <div class="kakao-wrap">
+        <h3>광고 메시지 작성</h3>
+        <p>마케팅 동의 고객에게 카카오 알림을 발송합니다.</p>
+
+        <div class="form-group">
+          <label>발송 대상</label>
+          <select id="kakao-target" style="width:200px; padding:8px 12px; border:0.5px solid #ddd; border-radius:6px;">
+            <option value="marketing">마케팅 동의 고객만</option>
+            <option value="all">전체 고객</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>메시지 내용</label>
+          <textarea id="kakao-msg" rows="6" style="width:100%; padding:10px 14px; border:0.5px solid #ddd; border-radius:6px; font-size:13px; font-family:inherit; resize:vertical;"
+            placeholder="[뤼미에르] 안녕하세요 고객님,&#10;&#10;신제품 출시 소식을 알려드립니다...&#10;&#10;수신거부: 채널 차단"
+            oninput="document.getElementById('kakao-preview-text').textContent = this.value"></textarea>
+        </div>
+
+        <div style="margin-bottom:16px;">
+          <p style="font-size:12px;color:#999;margin-bottom:8px;">미리보기</p>
+          <div class="kakao-preview" id="kakao-preview-text">메시지를 입력하면 미리보기가 표시됩니다.</div>
+        </div>
+
+        <div style="background:#fff8e1;border:0.5px solid #ffe082;border-radius:8px;padding:14px;margin-bottom:20px;font-size:12px;color:#795548;line-height:1.6;">
+          ⚠️ 광고성 메시지에는 반드시 <strong>[광고]</strong> 표기와 <strong>수신거부 방법</strong>을 포함해야 합니다.<br>
+          카카오 비즈니스 채널 연동 후 발송됩니다.
+        </div>
+
+        <button class="btn-gold" onclick="sendKakaoMessage()">카카오 발송 준비</button>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- 상품 등록/수정 모달 -->
+<div class="modal-overlay" id="product-modal">
+  <div class="modal">
+    <h3 id="product-modal-title">상품 등록</h3>
+    <input type="hidden" id="product-id">
+    <div class="form-group">
+      <label>카테고리</label>
+      <select id="p-category">
+        <option value="">선택</option>
+        <option value="자동차 방향제">자동차 방향제</option>
+        <option value="디퓨저">디퓨저</option>
+        <option value="향수">향수</option>
+        <option value="룸스프레이">룸스프레이</option>
+        <option value="소취제">소취제</option>
+        <option value="기타">기타</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>상품명</label>
+      <input type="text" id="p-name" placeholder="예: Lumière Vent Clip">
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>판매가 (₩)</label>
+        <input type="number" id="p-price" placeholder="28000">
+      </div>
+      <div class="form-group">
+        <label>원가 (₩)</label>
+        <input type="number" id="p-cost" placeholder="12000">
+      </div>
+    </div>
+    <div class="form-group">
+      <label>재고 수량</label>
+      <input type="number" id="p-stock" placeholder="100">
+    </div>
+    <div class="form-group">
+      <label>상품 설명</label>
+      <textarea id="p-desc" rows="3" placeholder="상품 설명을 입력하세요"></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-outline" onclick="closeModal('product-modal')">취소</button>
+      <button class="btn" onclick="saveProduct()">저장</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// 주문 탭 로드 (별도)
+function loadOrdersTab() {
+  const db = window._db;
+  const { collection, getDocs, query, orderBy } = window._collections;
+  getDocs(query(collection(db, "orders"), orderBy("createdAt", "desc"))).then(snap => {
+    const list = document.getElementById("orders-list");
+    list.innerHTML = "";
+    snap.forEach(d => {
+      const o = d.data();
+      const date = o.createdAt?.toDate ? o.createdAt.toDate() : new Date(o.createdAt || Date.now());
+      const profit = (o.totalPrice || 0) - (o.totalCost || 0);
+      list.innerHTML += `<tr>
+        <td>${date.toLocaleDateString("ko-KR")}</td>
+        <td>${o.customerName || "-"}</td>
+        <td>${o.customerEmail || "-"}</td>
+        <td>${(o.items || []).map(i => i.name).join(", ") || "-"}</td>
+        <td>₩${(o.totalPrice || 0).toLocaleString()}</td>
+        <td>₩${(o.totalCost || 0).toLocaleString()}</td>
+        <td>₩${profit.toLocaleString()}</td>
+        <td><span class="badge badge-${o.status || 'pending'}">${{pending:"대기",confirmed:"확인",shipping:"배송중",delivered:"완료",cancelled:"취소"}[o.status]||"대기"}</span></td>
+      </tr>`;
+    });
+  });
+}
+
+const origShowTab = window.showTab;
+window.showTab = (tab) => {
+  origShowTab(tab);
+  if (tab === "orders") loadOrdersTab();
+};
+</script>
+
+</body>
+</html>
